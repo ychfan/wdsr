@@ -61,7 +61,8 @@ def get_model_spec(params):
   loss_fn = torch.nn.L1Loss()
   metrics = {
       'loss': loss_fn,
-      'PSNR': functools.partial(common.metrics.psnr, shave=params.scale + 6)
+      'PSNR': functools.partial(common.metrics.psnr, shave=params.scale + 6),
+      'PSNR_Y': functools.partial(common.metrics.psnr_y, shave=params.scale),
   }
   return model, loss_fn, optimizer, lr_scheduler, metrics
 

@@ -2,14 +2,17 @@
 
 import os
 import random
-from PIL import Image
 import numpy as np
+from PIL import Image
+from skimage.io import imread
+from skimage import img_as_float, img_as_ubyte
 
 import torch.utils.data as data
 import torchvision.transforms as transforms
 
 import common.modes
 import common.io
+from common.images import imresize
 import datasets
 
 
@@ -150,4 +153,40 @@ class ImageSuperResolutionHdf5Dataset(ImageSuperResolutionDataset):
   def _load_item(self, index):
     lr_image = self.lr_cache_file.get(self.lr_files[index][0])
     hr_image = self.hr_cache_file.get(self.hr_files[index][0])
+    return lr_image, hr_image
+
+
+class ImageSuperResolutionBicubicDataset(ImageSuperResolutionDataset):
+
+  def __init__(self, mode, params, hr_files):
+    super(ImageSuperResolutionBicubicDataset, self).__init__(
+        mode,
+        params,
+        hr_files,
+        hr_files,
+    )
+
+  def __getitem__(self, index):
+    if self.mode == common.modes.PREDICT:
+      hr_image = imread(self.lr_files[index][1])
+      if hr_image.shape[0] % self.params.scale or hr_image.shape[
+          1] % self.params.scale:
+        hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :-(
+            hr_image.shape[1] % self.params.scale)]
+      lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
+      lr_image = np.asarray(lr_image)
+      lr_image = transforms.functional.to_tensor(lr_image)
+      return lr_image, self.hr_files[index][0]
+    else:
+      return super(ImageSuperResolutionBicubicDataset, self).__getitem__(index)
+
+  def _load_item(self, index):
+    hr_image = imread(self.hr_files[index][1])
+    if hr_image.shape[0] % self.params.scale or hr_image.shape[
+        1] % self.params.scale:
+      hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :-(
+          hr_image.shape[1] % self.params.scale)]
+    lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
+    lr_image = np.asarray(lr_image)
+    hr_image = np.asarray(hr_image)
     return lr_image, hr_image

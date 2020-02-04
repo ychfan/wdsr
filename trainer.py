@@ -48,6 +48,13 @@ if __name__ == '__main__':
       action='store_true',
       help='Running evaluation only.',
   )
+  parser.add_argument(
+      '--eval_datasets',
+      help='Dataset names for evaluation.',
+      default=None,
+      type=str,
+      nargs='+',
+  )
   # Experiment arguments
   parser.add_argument(
       '--save_checkpoints_epochs',
@@ -118,11 +125,19 @@ if __name__ == '__main__':
       params.master_proc = False
 
   train_dataset = dataset_module.get_dataset(common.modes.TRAIN, params)
-  eval_dataset = dataset_module.get_dataset(common.modes.EVAL, params)
+  if params.eval_datasets:
+    eval_datasets = []
+    for eval_dataset in params.eval_datasets:
+      eval_dataset_module = importlib.import_module('datasets.' + eval_dataset)
+      eval_datasets.append(
+          (eval_dataset,
+           eval_dataset_module.get_dataset(common.modes.EVAL, params)))
+  else:
+    eval_datasets = [(params.dataset,
+                      dataset_module.get_dataset(common.modes.EVAL, params))]
   if params.distributed:
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_dataset)
-    eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset)
     eval_sampler = None
   else:
     train_sampler = None
@@ -136,15 +151,16 @@ if __name__ == '__main__':
       pin_memory=True,
       sampler=train_sampler,
   )
-  eval_data_loader = DataLoader(
-      dataset=eval_dataset,
-      num_workers=params.num_data_threads,
-      batch_size=params.eval_batch_size,
-      shuffle=False,
-      drop_last=False,
-      pin_memory=True,
-      sampler=eval_sampler,
-  )
+  eval_data_loaders = [(data_name,
+                        DataLoader(
+                            dataset=dataset,
+                            num_workers=params.num_data_threads,
+                            batch_size=params.eval_batch_size,
+                            shuffle=False,
+                            drop_last=False,
+                            pin_memory=True,
+                            sampler=eval_sampler,
+                        )) for data_name, dataset in eval_datasets]
   model, criterion, optimizer, lr_scheduler, metrics = model_module.get_model_spec(
       params)
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -204,27 +220,29 @@ if __name__ == '__main__':
       writer.add_scalar('training_loss', loss_meter.avg, epoch)
 
   def evaluate(epoch):
-    metric_meters = {}
-    for metric_name in metrics.keys():
-      metric_meters[metric_name] = common.meters.AverageMeter()
-    time_meter = common.meters.TimeMeter()
     with torch.no_grad():
       model.eval()
-      for data, target in eval_data_loader:
-        data = data.to(device, non_blocking=True)
-        target = target.to(device, non_blocking=True)
-        output = model(data)
+      for eval_data_name, eval_data_loader in eval_data_loaders:
+        metric_meters = {}
         for metric_name in metrics.keys():
-          metric_meters[metric_name].update(
-              metrics[metric_name](output, target).item(), data.size(0))
-        time_meter.update(data.size(0))
-      for metric_name in metrics.keys():
-        logging.critical('Eval set: Average {}: {:.4f}'.format(
-            metric_name, metric_meters[metric_name].avg))
-        if epoch is not None:
-          writer.add_scalar(metric_name, metric_meters[metric_name].avg, epoch)
-      logging.critical('Eval set: Average Speed: {:.6f} seconds/sample'.format(
-          time_meter.avg))
+          metric_meters[metric_name] = common.meters.AverageMeter()
+        time_meter = common.meters.TimeMeter()
+        for data, target in eval_data_loader:
+          data = data.to(device, non_blocking=True)
+          target = target.to(device, non_blocking=True)
+          output = model(data)
+          for metric_name in metrics.keys():
+            metric_meters[metric_name].update(
+                metrics[metric_name](output, target).item(), data.size(0))
+          time_meter.update(data.size(0))
+        for metric_name in metrics.keys():
+          logging.critical('Eval {}: Average {}: {:.4f}'.format(
+              eval_data_name, metric_name, metric_meters[metric_name].avg))
+          if epoch is not None:
+            writer.add_scalar(eval_data_name + '/' + metric_name,
+                              metric_meters[metric_name].avg, epoch)
+        logging.critical('Eval {}: Average Speed: {:.6f} seconds/sample'.format(
+            eval_data_name, time_meter.avg))
 
   if params.eval_only:
     evaluate(None)
