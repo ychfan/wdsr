@@ -169,10 +169,10 @@ class ImageSuperResolutionBicubicDataset(ImageSuperResolutionDataset):
   def __getitem__(self, index):
     if self.mode == common.modes.PREDICT:
       hr_image = imread(self.lr_files[index][1])
-      if hr_image.shape[0] % self.params.scale or hr_image.shape[
-          1] % self.params.scale:
-        hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :-(
-            hr_image.shape[1] % self.params.scale)]
+      if hr_image.shape[0] % self.params.scale:
+        hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :]
+      if hr_image.shape[1] % self.params.scale:
+        hr_image = hr_image[:, :-(hr_image.shape[1] % self.params.scale)]
       lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
       lr_image = np.asarray(lr_image)
       lr_image = transforms.functional.to_tensor(lr_image)
@@ -182,10 +182,10 @@ class ImageSuperResolutionBicubicDataset(ImageSuperResolutionDataset):
 
   def _load_item(self, index):
     hr_image = imread(self.hr_files[index][1])
-    if hr_image.shape[0] % self.params.scale or hr_image.shape[
-        1] % self.params.scale:
-      hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :-(
-          hr_image.shape[1] % self.params.scale)]
+    if hr_image.shape[0] % self.params.scale:
+      hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :]
+    if hr_image.shape[1] % self.params.scale:
+      hr_image = hr_image[:, :-(hr_image.shape[1] % self.params.scale)]
     lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
     lr_image = np.asarray(lr_image)
     hr_image = np.asarray(hr_image)
