@@ -27,6 +27,7 @@ python trainer.py --dataset div2k --eval_datasets div2k set5 bsds100 urban100 --
 
 ## Datasets
 [DIV2K dataset: DIVerse 2K resolution high quality images as used for the NTIRE challenge on super-resolution @ CVPR 2017](https://data.vision.ee.ethz.ch/cvl/DIV2K/)
+
 [Benchmarks (Set5, BSDS100, Urban100)](http://vllab.ucmerced.edu/wlai24/LapSRN/results/SR_testing_datasets.zip)
 
 Download and organize data like: 

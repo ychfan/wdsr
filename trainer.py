@@ -34,6 +34,8 @@ if __name__ == '__main__':
   parser.add_argument(
       '--job_dir',
       help='Directory to write checkpoints and export models.',
+      default=None,
+      type=str,
       required=True,
   )
   parser.add_argument(
@@ -61,6 +63,11 @@ if __name__ == '__main__':
       help='Number of epochs to save checkpoint.',
       default=1,
       type=int)
+  parser.add_argument(
+      '--keep_checkpoints',
+      help='Keepining intermediate checkpoints.',
+      default=False,
+      action='store_true')
   parser.add_argument(
       '--train_epochs',
       help='Number of epochs to run training totally.',
@@ -174,9 +181,12 @@ if __name__ == '__main__':
     checkpoint = torch.load(
         params.ckpt or os.path.join(params.job_dir, 'latest.pth'),
         map_location=lambda storage, loc: storage.cuda())
-    model.load_state_dict(checkpoint['model_state_dict'])
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
+    try:
+      model.load_state_dict(checkpoint['model_state_dict'])
+      optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+      lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
+    except RuntimeError as e:
+      logging.critical(e)
     latest_epoch = checkpoint['epoch']
     logging.critical('Loaded checkpoint from epoch {}.'.format(latest_epoch))
   else:
@@ -255,7 +265,6 @@ if __name__ == '__main__':
       if params.master_proc:
         if not os.path.exists(params.job_dir):
           os.makedirs(params.job_dir)
-        evaluate(epoch)
         torch.save(
             {
                 'model_state_dict':
@@ -268,10 +277,13 @@ if __name__ == '__main__':
                 'epoch':
                     epoch,
             }, os.path.join(params.job_dir, 'epoch_{}.pth'.format(epoch)))
-        if os.path.exists(os.path.join(params.job_dir, 'latest.pth')):
-          os.remove(os.path.join(params.job_dir, 'latest.pth'))
-        os.symlink('epoch_{}.pth'.format(epoch),
-                   os.path.join(params.job_dir, 'latest.pth'))
+        latest_path = os.path.join(params.job_dir, 'latest.pth')
+        if os.path.exists(latest_path):
+          if not params.keep_checkpoints:
+            os.remove(os.path.join(params.job_dir, os.readlink(latest_path)))
+          os.remove(latest_path)
+        os.symlink('epoch_{}.pth'.format(epoch), latest_path)
+        evaluate(epoch)
 
   if params.master_proc:
     writer.close()

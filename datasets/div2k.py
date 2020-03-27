@@ -84,7 +84,7 @@ class DIV2K_(datasets._isr.ImageSuperResolutionDataset):
     else:
       hr_files = list_image_files(hr_dir)
 
-    super(DIV2K_test, self).__init__(
+    super(DIV2K_, self).__init__(
         mode,
         params,
         lr_files,
