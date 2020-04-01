@@ -217,9 +217,9 @@ if __name__ == '__main__':
       optimizer.step()
       if batch_idx % params.log_steps == 0:
         loss_meter.update(loss.item(), data.size(0))
-        time_meter.update(data.size(0))
+        time_meter.update_count(batch_idx + 1)
         logging.info(
-            'Train epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tSpeed: {:.6f} seconds/sample'
+            'Train epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tSpeed: {:.6f} seconds/batch'
             .format(epoch, batch_idx * len(data),
                     len(train_data_loader) * len(data),
                     100. * batch_idx / len(train_data_loader), loss.item(),

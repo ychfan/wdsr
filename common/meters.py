@@ -39,3 +39,9 @@ class TimeMeter:
     self.sum = self.end_time - self.start_time
     self.count += n
     self.avg = self.sum / self.count
+
+  def update_count(self, count):
+    self.end_time = time.time()
+    self.sum = self.end_time - self.start_time
+    self.count += count
+    self.avg = self.sum / self.count
