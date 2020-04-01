@@ -64,8 +64,22 @@ class ImageSuperResolutionDataset(data.Dataset):
       index = index // self.params.num_patches
 
     lr_image, hr_image = self._load_item(index)
+    lr_image, hr_image = self._sample_patch(lr_image, hr_image)
+    lr_image, hr_image = self._augment(lr_image, hr_image)
 
-    # sample patch while training
+    lr_image = np.ascontiguousarray(lr_image)
+    hr_image = np.ascontiguousarray(hr_image)
+    lr_image = transforms.functional.to_tensor(lr_image)
+    hr_image = transforms.functional.to_tensor(hr_image)
+
+    return lr_image, hr_image
+
+  def _load_item(self, index):
+    lr_image = np.asarray(Image.open(self.lr_files[index][1]))
+    hr_image = np.asarray(Image.open(self.hr_files[index][1]))
+    return lr_image, hr_image
+
+  def _sample_patch(self, lr_image, hr_image):
     if self.mode == common.modes.TRAIN:
       # sample patch while training
       x = random.randrange(
@@ -85,9 +99,11 @@ class ImageSuperResolutionDataset(data.Dataset):
       hr_image = hr_image[:lr_image.shape[0] *
                           self.params.scale, :lr_image.shape[1] *
                           self.params.scale]
+    return lr_image, hr_image
 
-    # augmentation while training
+  def _augment(self, lr_image, hr_image):
     if self.mode == common.modes.TRAIN:
+      # augmentation while training
       if random.random() < 0.5:
         lr_image = lr_image[::-1]
         hr_image = hr_image[::-1]
@@ -97,17 +113,6 @@ class ImageSuperResolutionDataset(data.Dataset):
       if random.random() < 0.5:
         lr_image = np.swapaxes(lr_image, 0, 1)
         hr_image = np.swapaxes(hr_image, 0, 1)
-
-    lr_image = np.ascontiguousarray(lr_image)
-    hr_image = np.ascontiguousarray(hr_image)
-
-    lr_image = transforms.functional.to_tensor(lr_image)
-    hr_image = transforms.functional.to_tensor(hr_image)
-    return lr_image, hr_image
-
-  def _load_item(self, index):
-    lr_image = np.asarray(Image.open(self.lr_files[index][1]))
-    hr_image = np.asarray(Image.open(self.hr_files[index][1]))
     return lr_image, hr_image
 
   def __len__(self):
@@ -168,25 +173,77 @@ class ImageSuperResolutionBicubicDataset(ImageSuperResolutionDataset):
 
   def __getitem__(self, index):
     if self.mode == common.modes.PREDICT:
-      hr_image = imread(self.lr_files[index][1])
+      hr_image = np.asarray(Image.open(self.lr_files[index][1]))
       if hr_image.shape[0] % self.params.scale:
         hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :]
       if hr_image.shape[1] % self.params.scale:
         hr_image = hr_image[:, :-(hr_image.shape[1] % self.params.scale)]
       lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
-      lr_image = np.asarray(lr_image)
       lr_image = transforms.functional.to_tensor(lr_image)
       return lr_image, self.hr_files[index][0]
     else:
       return super(ImageSuperResolutionBicubicDataset, self).__getitem__(index)
 
   def _load_item(self, index):
-    hr_image = imread(self.hr_files[index][1])
-    if hr_image.shape[0] % self.params.scale:
-      hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :]
-    if hr_image.shape[1] % self.params.scale:
-      hr_image = hr_image[:, :-(hr_image.shape[1] % self.params.scale)]
-    lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
-    lr_image = np.asarray(lr_image)
-    hr_image = np.asarray(hr_image)
+    hr_image = np.asarray(Image.open(self.hr_files[index][1]))
+    lr_image = hr_image
+    return lr_image, hr_image
+
+  def _sample_patch(self, lr_image, hr_image):
+    if self.mode == common.modes.TRAIN:
+      # sample patch while training
+      hr_ignored_boundary_size = self.params.ignored_boundary_size * self.params.scale
+      hr_patch_size = self.params.lr_patch_size * self.params.scale + hr_ignored_boundary_size * 2
+      try:
+        x = random.randrange(0, hr_image.shape[0] - hr_patch_size + 1)
+        y = random.randrange(0, hr_image.shape[1] - hr_patch_size + 1)
+      except ValueError:
+        print(hr_image, hr_patch_size)
+      hr_image = hr_image[x:x + hr_patch_size, y:y + hr_patch_size]
+      lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
+      lr_image = lr_image[
+          self.params.ignored_boundary_size:-self.params.ignored_boundary_size,
+          self.params.ignored_boundary_size:-self.params.ignored_boundary_size]
+      hr_image = hr_image[hr_ignored_boundary_size:-hr_ignored_boundary_size,
+                          hr_ignored_boundary_size:-hr_ignored_boundary_size]
+    else:
+      if hr_image.shape[0] % self.params.scale:
+        hr_image = hr_image[:-(hr_image.shape[0] % self.params.scale), :]
+      if hr_image.shape[1] % self.params.scale:
+        hr_image = hr_image[:, :-(hr_image.shape[1] % self.params.scale)]
+      hr_image = np.asarray(hr_image)
+      lr_image = imresize(hr_image, scalar_scale=1 / self.params.scale)
+    return lr_image, hr_image
+
+
+class ImageSuperResolutionBicubicHdf5Dataset(ImageSuperResolutionBicubicDataset
+                                            ):
+
+  def __init__(
+      self,
+      mode,
+      params,
+      hr_files,
+      hr_cache_file,
+      lib_hdf5='h5py',
+  ):
+    super(ImageSuperResolutionBicubicHdf5Dataset, self).__init__(
+        mode,
+        params,
+        hr_files,
+    )
+    self.hr_cache_file = common.io.Hdf5(hr_cache_file, lib_hdf5)
+
+    cache_dir = os.path.dirname(hr_cache_file)
+    if not os.path.exists(cache_dir):
+      os.makedirs(cache_dir)
+
+    if self.mode != common.modes.PREDICT:
+      if not os.path.exists(hr_cache_file):
+        for hr_file in self.hr_files:
+          self.hr_cache_file.add(hr_file[0], np.asarray(Image.open(hr_file[1])))
+
+  def _load_item(self, index):
+    hr_image = self.hr_cache_file.get(self.hr_files[index][0])
+    lr_image = hr_image
     return lr_image, hr_image
