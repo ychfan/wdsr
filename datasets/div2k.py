@@ -8,7 +8,6 @@ TRAIN_LR_DIR = lambda s: LOCAL_DIR + 'DIV2K_train_LR_bicubic/X{}/'.format(s)
 TRAIN_HR_DIR = LOCAL_DIR + 'DIV2K_train_HR/'
 EVAL_LR_DIR = lambda s: LOCAL_DIR + 'DIV2K_valid_LR_bicubic/X{}/'.format(s)
 EVAL_HR_DIR = LOCAL_DIR + 'DIV2K_valid_HR/'
-PREDICT_LR_DIR = lambda s: LOCAL_DIR + 'DIV2K_valid_LR_bicubic/X{}/'.format(s)
 
 
 def update_argparser(parser):
@@ -39,12 +38,10 @@ class DIV2K(datasets._isr.ImageSuperResolutionHdf5Dataset):
     lr_dir = {
         common.modes.TRAIN: TRAIN_LR_DIR(params.scale),
         common.modes.EVAL: EVAL_LR_DIR(params.scale),
-        common.modes.PREDICT: PREDICT_LR_DIR(params.scale),
     }[mode]
     hr_dir = {
         common.modes.TRAIN: TRAIN_HR_DIR,
         common.modes.EVAL: EVAL_HR_DIR,
-        common.modes.PREDICT: '',
     }[mode]
 
     lr_files = list_image_files(lr_dir)
