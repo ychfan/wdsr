@@ -197,9 +197,6 @@ if __name__ == '__main__':
       model = convert_syncbn_model(model)
     model = DistributedDataParallel(model)
 
-  if params.master_proc:
-    writer = SummaryWriter(params.job_dir)
-
   def train(epoch):
     if params.distributed:
       train_sampler.set_epoch(epoch)
@@ -257,6 +254,9 @@ if __name__ == '__main__':
   if params.eval_only:
     evaluate(None)
     exit()
+
+  if params.master_proc:
+    writer = SummaryWriter(params.job_dir)
 
   for epoch in range(latest_epoch + 1, params.train_epochs + 1):
     train(epoch)
