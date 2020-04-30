@@ -1,10 +1,6 @@
 import os
-import numpy as np
-from skimage.io import imread
-from skimage import img_as_float, img_as_ubyte
 
 import common.modes
-from common.images import imresize
 import datasets._isr
 
 LOCAL_DIR = 'data/Set5/'
