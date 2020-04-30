@@ -146,6 +146,7 @@ if __name__ == '__main__':
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         train_dataset)
     eval_sampler = None
+    params.train_batch_size //= torch.cuda.device_count()
   else:
     train_sampler = None
     eval_sampler = None
