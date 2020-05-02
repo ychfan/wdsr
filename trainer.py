@@ -45,6 +45,12 @@ if __name__ == '__main__':
       type=str,
   )
   parser.add_argument(
+      '--override_epoch',
+      help='Override epoch number when loading from checkpoint.',
+      default=None,
+      type=int,
+  )
+  parser.add_argument(
       '--eval_only',
       default=False,
       action='store_true',
@@ -190,6 +196,9 @@ if __name__ == '__main__':
       logging.critical(e)
     latest_epoch = checkpoint['epoch']
     logging.critical('Loaded checkpoint from epoch {}.'.format(latest_epoch))
+    if params.override_epoch is not None:
+      latest_epoch = params.override_epoch
+      logging.critical('Overrode epoch number to {}.'.format(latest_epoch))
   else:
     latest_epoch = 0
 
