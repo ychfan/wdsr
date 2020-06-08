@@ -60,9 +60,16 @@ def get_model_spec(params):
                                                 params.learning_rate_decay)
   loss_fn = torch.nn.L1Loss()
   metrics = {
-      'loss': loss_fn,
-      'PSNR': functools.partial(common.metrics.psnr, shave=params.scale + 6),
-      'PSNR_Y': functools.partial(common.metrics.psnr_y, shave=params.scale),
+      'loss':
+          loss_fn,
+      'PSNR':
+          functools.partial(
+              common.metrics.psnr,
+              shave=0 if params.scale == 1 else params.scale + 6),
+      'PSNR_Y':
+          functools.partial(
+              common.metrics.psnr_y,
+              shave=0 if params.scale == 1 else params.scale),
   }
   return model, loss_fn, optimizer, lr_scheduler, metrics
 
